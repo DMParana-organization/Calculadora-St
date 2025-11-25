@@ -1,19 +1,19 @@
 import streamlit as st
 import pandas as pd
 import fdb
-from dotenv import load_dotenv
+#from dotenv import load_dotenv
 import os
 
 # =======================================
 # 1. CARREGAR VARIÁVEIS DO ARQUIVO .ENV
 # =======================================
-load_dotenv()
+#load_dotenv()
 
-FB_HOST = os.getenv("FB_HOST")          # ex: 127.0.0.1
-FB_PORT = os.getenv("FB_PORT")
-FB_DATABASE = os.getenv("FB_DATABASE")  # caminho do .fdb
-FB_USER = os.getenv("FB_USER")
-FB_PASSWORD = os.getenv("FB_PASSWORD")
+FB_HOST = st.secrets["FB_HOST"]
+FB_PORT = st.secrets["FB_PORT"]
+FB_DATABASE = st.secrets["FB_DATABASE"]
+FB_USER = st.secrets["FB_USER"]
+FB_PASSWORD = st.secrets["FB_PASSWORD"]
 
 # =======================================
 # 2. FORÇAR CARREGAMENTO DO CLIENT FIREBIRD
@@ -28,7 +28,7 @@ except Exception as e:
 # =======================================
 def conectar_firebird():
     return fdb.connect(
-        host=FB_HOST,               # já inclui host:porta
+        host=FB_HOST,
         port=int(FB_PORT),
         database=FB_DATABASE,
         user=FB_USER,
