@@ -1,4 +1,4 @@
 streamlit
-python-dotenv
-firebirdsql
 pandas
+firebirdsql
+# rebuild
