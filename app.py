@@ -1,14 +1,11 @@
 import streamlit as st
 import pandas as pd
 import fdb
-#from dotenv import load_dotenv
 import os
 
 # =======================================
-# 1. CARREGAR VARIÁVEIS DO ARQUIVO .ENV
+# 1. CARREGAR CONFIG DO SECRETS.TOML
 # =======================================
-#load_dotenv()
-
 FB_HOST = st.secrets["FB_HOST"]
 FB_PORT = st.secrets["FB_PORT"]
 FB_DATABASE = st.secrets["FB_DATABASE"]
@@ -16,23 +13,22 @@ FB_USER = st.secrets["FB_USER"]
 FB_PASSWORD = st.secrets["FB_PASSWORD"]
 
 # =======================================
-# 2. DETECTAR AMBIENTE (LOCAL vs STREAMLIT CLOUD)
+# 2. DETECTAR AMBIENTE (LOCAL vs CLOUD)
 # =======================================
-RODANDO_NO_CLOUD = os.name != "nt"  # Windows = local, Linux = Cloud
+RODANDO_NO_CLOUD = os.name != "nt"  # Windows = local
 
 if not RODANDO_NO_CLOUD:
-    # Estamos em Windows → carregar DLL
+    # Windows → Carrega DLL do Firebird
     try:
         fdb.load_api(r"C:\Drivers\Firebird\GDS32.DLL")
-        print("DLL Firebird carregada com sucesso.")
+        print("✔ DLL Firebird carregada.")
     except Exception as e:
-        print(f"Falha ao carregar DLL Firebird: {e}")
+        print(f"⚠ Não foi possível carregar a DLL Firebird: {e}")
 else:
-    # Estamos no Streamlit Cloud → NÃO usar DLL
-    print("Rodando no Streamlit Cloud → DLL ignorada.")
+    print("✔ Rodando no Streamlit Cloud (DLL ignorada).")
 
 # =======================================
-# 3. FUNÇÃO DE CONEXÃO
+# 3. FUNÇÃO DE CONEXÃO FIREBIRD
 # =======================================
 def conectar_firebird():
     return fdb.connect(
@@ -44,11 +40,10 @@ def conectar_firebird():
         charset="UTF8"
     )
 
-
 # =======================================
-# 4. CONSULTA SQL COMPLETA
+# 4. CONSULTA SQL
 # =======================================
-SQL = """
+SQL_BASE = """
 WITH
 PARAMETROS AS (
     SELECT
@@ -133,52 +128,40 @@ WHERE POSICAO_CLIV = 1
   AND STATUS_CLIENTE = 'A'
 """
 
-
 # =======================================
 # 5. INTERFACE STREAMLIT
 # =======================================
-st.title("🔎 Calculadora ST (Em Testes)")
-
+st.title("🔎 Calculadora ST")
 st.subheader("Filtros opcionais")
 
-# Instrução para múltiplos valores separados por vírgula
-cod_clientes_str = st.text_input("Filtrar por COD_CLIENTE (separar múltiplos por vírgula):")
-cod_produtos_str = st.text_input("Filtrar por COD_PRODUTO (separar múltiplos por vírgula):")
+cod_clientes_str = st.text_input("Filtrar por COD_CLIENTE (separar por vírgula):")
+cod_produtos_str = st.text_input("Filtrar por COD_PRODUTO (separar por vírgula):")
 
+# =======================================
+# 6. EXECUTAR CONSULTA
+# =======================================
 if st.button("Executar Consulta"):
     try:
         conn = conectar_firebird()
-        query = SQL
+        query = SQL_BASE
 
-        # --- Lógica de Filtragem por Múltiplos Valores ---
-
-        # 1. Processar códigos de cliente
+        # --- FILTRO CLIENTES ---
         if cod_clientes_str:
-            # Divide a string por vírgula, remove espaços e filtros vazios
-            # O resultado é uma string de códigos separados por vírgula: "100,201,350"
-            lista_clientes = ','.join([c.strip() for c in cod_clientes_str.split(',') if c.strip().isdigit()])
-            if lista_clientes:
-                # Adiciona o filtro usando o operador IN
-                # Importante: A cláusula WHERE deve ser adicionada à sua SQL completa
-                query += f" AND CLI.CODCLI_CLIV IN ({lista_clientes})"
+            lista = [c.strip() for c in cod_clientes_str.split(',') if c.strip().isdigit()]
+            if lista:
+                query += f" AND CLI.CODCLI_CLIV IN ({','.join(lista)})"
 
-        # 2. Processar códigos de produto
+        # --- FILTRO PRODUTOS ---
         if cod_produtos_str:
-            # Divide a string por vírgula, remove espaços e filtros vazios
-            # Assumindo que COD_PRODUTO é numérico. Se for STRING, precisa de aspas: "'PROD1','PROD2'"
-            lista_produtos = ','.join([p.strip() for p in cod_produtos_str.split(',') if p.strip().isdigit()])
-            if lista_produtos:
-                # Adiciona o filtro usando o operador IN
-                query += f" AND P.COD_PRODUTO IN ({lista_produtos})"
-        
-        # ------------------------------------------------
+            lista = [p.strip() for p in cod_produtos_str.split(',') if p.strip().isdigit()]
+            if lista:
+                query += f" AND P.COD_PRODUTO IN ({','.join(lista)})"
 
         df = pd.read_sql(query, conn)
+        conn.close()
 
         st.success(f"{len(df)} registros encontrados.")
         st.dataframe(df, width=1000)
-
-        conn.close()
 
     except Exception as e:
         st.error(f"Erro ao executar consulta: {e}")
