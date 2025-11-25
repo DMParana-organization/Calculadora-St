@@ -1,6 +1,6 @@
 import streamlit as st
 import pandas as pd
-import fdb
+import firebirdsql
 import os
 
 # =======================================
@@ -13,25 +13,10 @@ FB_USER = st.secrets["FB_USER"]
 FB_PASSWORD = st.secrets["FB_PASSWORD"]
 
 # =======================================
-# 2. DETECTAR AMBIENTE (LOCAL vs CLOUD)
-# =======================================
-RODANDO_NO_CLOUD = os.name != "nt"  # Windows = local
-
-if not RODANDO_NO_CLOUD:
-    # Windows → Carrega DLL do Firebird
-    try:
-        fdb.load_api(r"C:\Drivers\Firebird\GDS32.DLL")
-        print("✔ DLL Firebird carregada.")
-    except Exception as e:
-        print(f"⚠ Não foi possível carregar a DLL Firebird: {e}")
-else:
-    print("✔ Rodando no Streamlit Cloud (DLL ignorada).")
-
-# =======================================
-# 3. FUNÇÃO DE CONEXÃO FIREBIRD
+# 2. FUNÇÃO DE CONEXÃO FIREBIRD
 # =======================================
 def conectar_firebird():
-    return fdb.connect(
+    return firebirdsql.connect(
         host=FB_HOST,
         port=int(FB_PORT),
         database=FB_DATABASE,
@@ -41,7 +26,7 @@ def conectar_firebird():
     )
 
 # =======================================
-# 4. CONSULTA SQL
+# 3. CONSULTA SQL BASE
 # =======================================
 SQL_BASE = """
 WITH
@@ -129,39 +114,48 @@ WHERE POSICAO_CLIV = 1
 """
 
 # =======================================
-# 5. INTERFACE STREAMLIT
+# 4. INTERFACE STREAMLIT
 # =======================================
 st.title("🔎 Calculadora ST")
 st.subheader("Filtros opcionais")
 
-cod_clientes_str = st.text_input("Filtrar por COD_CLIENTE (separar por vírgula):")
-cod_produtos_str = st.text_input("Filtrar por COD_PRODUTO (separar por vírgula):")
+cod_clientes_str = st.text_input("Filtrar por COD_CLIENTE (separados por vírgula):")
+cod_produtos_str = st.text_input("Filtrar por COD_PRODUTO (separados por vírgula):")
 
 # =======================================
-# 6. EXECUTAR CONSULTA
+# 5. EXECUTAR CONSULTA
 # =======================================
 if st.button("Executar Consulta"):
     try:
         conn = conectar_firebird()
+        cur = conn.cursor()
+
         query = SQL_BASE
 
         # --- FILTRO CLIENTES ---
         if cod_clientes_str:
-            lista = [c.strip() for c in cod_clientes_str.split(',') if c.strip().isdigit()]
+            lista = [c.strip() for c in cod_clientes_str.split(",") if c.strip().isdigit()]
             if lista:
                 query += f" AND CLI.CODCLI_CLIV IN ({','.join(lista)})"
 
         # --- FILTRO PRODUTOS ---
         if cod_produtos_str:
-            lista = [p.strip() for p in cod_produtos_str.split(',') if p.strip().isdigit()]
+            lista = [p.strip() for p in cod_produtos_str.split(",") if p.strip().isdigit()]
             if lista:
                 query += f" AND P.COD_PRODUTO IN ({','.join(lista)})"
 
-        df = pd.read_sql(query, conn)
-        conn.close()
+        # Executa consulta
+        cur.execute(query)
+
+        columns = [col[0] for col in cur.description]
+        rows = cur.fetchall()
+
+        df = pd.DataFrame(rows, columns=columns)
 
         st.success(f"{len(df)} registros encontrados.")
         st.dataframe(df, width=1000)
+
+        conn.close()
 
     except Exception as e:
         st.error(f"Erro ao executar consulta: {e}")
