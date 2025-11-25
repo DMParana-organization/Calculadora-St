@@ -16,12 +16,20 @@ FB_USER = st.secrets["FB_USER"]
 FB_PASSWORD = st.secrets["FB_PASSWORD"]
 
 # =======================================
-# 2. FORÇAR CARREGAMENTO DO CLIENT FIREBIRD
+# 2. DETECTAR AMBIENTE (LOCAL vs STREAMLIT CLOUD)
 # =======================================
-try:
-    fdb.load_api(r'C:\Drivers\Firebird\GDS32.DLL')
-except Exception as e:
-    print("Erro ao carregar biblioteca Firebird:", e)
+RODANDO_NO_CLOUD = os.name != "nt"  # Windows = local, Linux = Cloud
+
+if not RODANDO_NO_CLOUD:
+    # Estamos em Windows → carregar DLL
+    try:
+        fdb.load_api(r"C:\Drivers\Firebird\GDS32.DLL")
+        print("DLL Firebird carregada com sucesso.")
+    except Exception as e:
+        print(f"Falha ao carregar DLL Firebird: {e}")
+else:
+    # Estamos no Streamlit Cloud → NÃO usar DLL
+    print("Rodando no Streamlit Cloud → DLL ignorada.")
 
 # =======================================
 # 3. FUNÇÃO DE CONEXÃO
