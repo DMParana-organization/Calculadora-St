@@ -29,6 +29,7 @@ except Exception as e:
 def conectar_firebird():
     return fdb.connect(
         host=FB_HOST,               # já inclui host:porta
+        port=int(FB_PORT),
         database=FB_DATABASE,
         user=FB_USER,
         password=FB_PASSWORD,
@@ -167,7 +168,7 @@ if st.button("Executar Consulta"):
         df = pd.read_sql(query, conn)
 
         st.success(f"{len(df)} registros encontrados.")
-        st.dataframe(df, use_container_width=True)
+        st.dataframe(df, width=1000)
 
         conn.close()
 
